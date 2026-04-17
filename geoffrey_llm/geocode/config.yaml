@@ -1,0 +1,81 @@
+# geoffrey configuration
+# Place this at ~/.geoffrey/config.yaml
+
+geoffrey:
+  memory_dir: ~/.geoffrey/memory
+  sessions_dir: ~/.geoffrey/sessions
+
+# Model configuration
+model:
+  # Provider: kimi, deepseek, qwen, openai
+  provider: kimi
+
+  # Model names vary by provider:
+  # kimi: moonshot-v1-8k, moonshot-v1-32k, moonshot-v1-128k
+  # deepseek: deepseek-chat, deepseek-coder
+  # qwen: qwen-turbo, qwen-plus, qwen-max
+  # openai: gpt-3.5-turbo, gpt-4
+  model_name: moonshot-v1-8k
+
+  # API keys (can also be set via environment variables)
+  # KIMI_API_KEY, DEEPSEEK_API_KEY, DASHSCOPE_API_KEY, OPENAI_API_KEY
+  api_key: ${KIMI_API_KEY}
+
+  # Optional: custom base URL for proxies
+  # base_url: https://api.moonshot.cn/v1
+
+# Tool configuration
+tools:
+  bash:
+    # Allowed commands (lowercase)
+    allowed_commands:
+      - git
+      - ls
+      - cat
+      - grep
+      - find
+      - wc
+      - head
+      - tail
+      - pwd
+      - mkdir
+      - rm
+      - cp
+      - mv
+      - echo
+      - touch
+      - chmod
+      - awk
+      - sed
+      - sort
+      - uniq
+      - diff
+      - zip
+      - unzip
+      - tar
+      - curl
+      - wget
+      - python
+      - pip
+      - npm
+      - node
+      - docker
+      - make
+      - cargo
+      - go
+      - java
+    # Command patterns to block
+    disallowed_patterns:
+      - "rm -rf /"
+      - ":(){ :|: & };:"
+      - "curl.*|.*sh"
+      - "wget.*|.*sh"
+    # Timeout in seconds
+    timeout_seconds: 30
+
+# UI configuration
+ui:
+  theme: dark  # dark, light
+  streaming: true
+  syntax_highlighting: true
+  show_timestamps: false
