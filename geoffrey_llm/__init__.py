@@ -1,32 +1,14 @@
-"""geoffrey-llm: A lightweight toolkit for LLM development"""
+"""geoffrey-llm: A lightweight toolkit for LLM development.
 
-__version__ = "0.1.0"
+顶层包只暴露元信息,各子模块独立 import:
+    from geoffrey_llm.ml import Trainer, Evaluator
+    from geoffrey_llm.geocode import REPL, BaseModel
+    from geoffrey_llm.finetune import LoRATrainer  # 待实现
+"""
+
+import importlib.metadata as _metadata
+
+__version__ = _metadata.version("geoffrey-llm")
 __author__ = "Geoffrey"
 
-from .core import placeholder
-
-# Geocode module
-from geoffrey_llm.geocode import (
-    REPL,
-    BaseModel,
-    ModelResponse,
-    Tool,
-    ToolInput,
-    ToolResult,
-    MemoryStore,
-    SessionManager,
-)
-
-
-__all__ = [
-    "placeholder",
-    # Geocode
-    "REPL",
-    "BaseModel",
-    "ModelResponse",
-    "Tool",
-    "ToolInput",
-    "ToolResult",
-    "MemoryStore",
-    "SessionManager",
-]
+__all__ = ["__version__", "__author__"]

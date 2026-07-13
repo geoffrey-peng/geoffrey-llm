@@ -1,10 +1,9 @@
-from geoffrey_llm import placeholder, __version__
+from geoffrey_llm import __author__, __version__
 
 
 def test_version():
-    assert __version__ == "0.0.1"
+    assert __version__ == "0.2.0"
 
 
-def test_placeholder():
-    result = placeholder()
-    assert "under development" in result
+def test_author():
+    assert __author__ == "Geoffrey"

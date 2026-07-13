@@ -1,7 +1,4 @@
-import sys
-sys.path.insert(0, 'D:\\develop\\code\\python\\geoffrey-llm')
-
-# Test imports
+# Test imports (run with `pip install -e .[geocode]` then `python test_geocode.py`)
 from geoffrey_llm.geocode.models.base import BaseModel, ModelConfig, ModelResponse
 from geoffrey_llm.geocode.models.kimi import KimiProvider
 from geoffrey_llm.geocode.tools.base import Tool, ToolInput, ToolResult
