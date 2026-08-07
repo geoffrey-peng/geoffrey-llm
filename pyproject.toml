@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "geoffrey-llm"
-version = "0.2.0"
+version = "0.3.0"
 description = "A lightweight toolkit for LLM fine-tuning, inference optimization, and agent development"
 readme = "README.md"
 license = {text = "MIT"}
@@ -58,8 +58,11 @@ geocode = [
     "pyyaml>=6.0",
     "requests>=2.31.0",
 ]
+blog = [
+    "httpx>=0.25.0",
+]
 all = [
-    "geoffrey-llm[dev,ml,dl,finetune,geocode]",
+    "geoffrey-llm[dev,ml,dl,finetune,geocode,blog]",
 ]
 
 [project.scripts]

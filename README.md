@@ -4,7 +4,7 @@
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-一个轻量的 LLM 工具包,包含机器学习、深度学习、agent 构建、大模型微调四个独立子模块。每个模块依赖隔离,按需安装。
+一个轻量的 LLM 工具包,包含机器学习、深度学习、agent 构建、博客客户端、大模型微调等独立子模块。每个模块依赖隔离,按需安装。
 
 ## 模块总览
 
@@ -13,6 +13,7 @@
 | `geoffrey_llm.ml` | 机器学习(基于 sklearn,统一 API + 中文评估报表) | `[ml]` | ![Active](https://img.shields.io/badge/status-Active-green) |
 | `geoffrey_llm.dl` | 深度学习(基于 torch,神经网络封装) | `[dl]` | ![Planned](https://img.shields.io/badge/status-Planned-lightgrey) |
 | `geoffrey_llm.geocode` | 大模型 agent 构建(Claude Code 风格 REPL) | `[geocode]` | ![Alpha](https://img.shields.io/badge/status-Alpha-yellow) |
+| `geoffrey_llm.blog` | 个人博客 REST API 客户端 | `[blog]` | ![Active](https://img.shields.io/badge/status-Active-green) |
 | `geoffrey_llm.finetune` | 大模型微调(LoRA / QLoRA,基于 transformers/peft) | `[finetune]` | ![Planned](https://img.shields.io/badge/status-Planned-lightgrey) |
 
 ## 安装
@@ -23,6 +24,9 @@ pip install geoffrey-llm[ml]
 
 # 只装 agent REPL
 pip install geoffrey-llm[geocode]
+
+# 只装博客客户端
+pip install geoffrey-llm[blog]
 
 # 装全部(含 dev 工具)
 pip install geoffrey-llm[all]
@@ -76,6 +80,31 @@ geocode 特性:
 - 会话持久化与 resume
 - MCP (Model Context Protocol) 集成
 
+### 博客客户端
+
+博客客户端调用博客的 `API_TOKEN`，不是 Flask 的 `SECRET_KEY`。支持的环境变量优先级为 `BLOG_API_TOKEN`、`BLOG_SECRET`、`BLOG_SERCET`；`BLOG_SERCET` 用于兼容已有配置。
+
+```bash
+export BLOG_BASE_URL="https://blog.geoffrey-peng.cc"
+export BLOG_SERCET="your-blog-api-token"
+```
+
+```python
+from geoffrey_llm.blog import BlogClient
+
+with BlogClient() as blog:
+    posts = blog.list_posts(page=1, per_page=10)
+    blog.create_post(
+        title="SDK 发布",
+        slug="sdk-release",
+        content="通过 geoffrey-llm 发布。",
+        category_id=1,
+        is_public=True,
+    )
+```
+
+支持分类、文章 CRUD 和分享链接管理：`list_categories`、`list_posts`、`get_post`、`create_post`、`update_post`、`delete_post`、`create_share`、`list_shares`、`revoke_share`。
+
 ## 设计原则
 
 - **依赖隔离**:`import geoffrey_llm` 不拉任何重依赖,各模块按 extras 安装
@@ -98,6 +127,7 @@ geoffrey_llm/
 ├── geocode/        # agent 构建
 │   ├── cli.py / repl.py
 │   ├── models/ tools/ memory/ session/ cmd/ mcp/ prompts/
+├── blog/           # 个人博客 REST API 客户端
 └── finetune/       # 大模型微调(占位)
 ```
 
