@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "geoffrey-llm"
-version = "0.3.0"
+version = "0.4.0"
 description = "A lightweight toolkit for LLM fine-tuning, inference optimization, and agent development"
 readme = "README.md"
 license = {text = "MIT"}
@@ -60,6 +60,48 @@ geocode = [
 ]
 blog = [
     "httpx>=0.25.0",
+]
+cloud-aws = [
+    "boto3>=1.34",
+]
+cloud-alibaba = [
+    "alibabacloud-ecs20140526>=4.0",
+    "alibabacloud-vpc20160428>=2.0",
+    "alibabacloud-rds20140815>=2.0",
+    "alibabacloud-credentials>=0.3",
+    "alibabacloud-tea-openapi>=0.3",
+    "oss2>=2.18",
+]
+cloud-tencent = [
+    "tencentcloud-sdk-python-common>=3.0",
+    "tencentcloud-sdk-python-cvm>=3.0",
+    "tencentcloud-sdk-python-vpc>=3.0",
+    "tencentcloud-sdk-python-cdb>=3.0",
+    "cos-python-sdk-v5>=1.9",
+]
+cloud-huawei = [
+    "huaweicloudsdkecs>=3.1",
+    "huaweicloudsdkvpc>=3.1",
+    "huaweicloudsdkrds>=3.1",
+    "esdk-obs-python>=3.24",
+]
+cloud = [
+    "boto3>=1.34",
+    "alibabacloud-ecs20140526>=4.0",
+    "alibabacloud-vpc20160428>=2.0",
+    "alibabacloud-rds20140815>=2.0",
+    "alibabacloud-credentials>=0.3",
+    "alibabacloud-tea-openapi>=0.3",
+    "oss2>=2.18",
+    "tencentcloud-sdk-python-common>=3.0",
+    "tencentcloud-sdk-python-cvm>=3.0",
+    "tencentcloud-sdk-python-vpc>=3.0",
+    "tencentcloud-sdk-python-cdb>=3.0",
+    "cos-python-sdk-v5>=1.9",
+    "huaweicloudsdkecs>=3.1",
+    "huaweicloudsdkvpc>=3.1",
+    "huaweicloudsdkrds>=3.1",
+    "esdk-obs-python>=3.24",
 ]
 all = [
     "geoffrey-llm[dev,ml,dl,finetune,geocode,blog]",

@@ -20,6 +20,10 @@ wheels/
 *.egg
 MANIFEST
 .env
+.env.*
+.cloud/secrets/
+.cloud/**/credentials*
+.cloud/**/*.pem
 .venv
 env/
 venv/

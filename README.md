@@ -4,7 +4,7 @@
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-一个轻量的 LLM 工具包,包含机器学习、深度学习、agent 构建、博客客户端、大模型微调等独立子模块。每个模块依赖隔离,按需安装。
+一个轻量的 LLM 与多云工具包，包含机器学习、深度学习、agent 构建、大模型微调和多云资源管理模块。每个模块依赖隔离，按需安装。
 
 ## 模块总览
 
@@ -14,7 +14,9 @@
 | `geoffrey_llm.dl` | 深度学习(基于 torch,神经网络封装) | `[dl]` | ![Planned](https://img.shields.io/badge/status-Planned-lightgrey) |
 | `geoffrey_llm.geocode` | 大模型 agent 构建(Claude Code 风格 REPL) | `[geocode]` | ![Alpha](https://img.shields.io/badge/status-Alpha-yellow) |
 | `geoffrey_llm.blog` | 个人博客 REST API 客户端 | `[blog]` | ![Active](https://img.shields.io/badge/status-Active-green) |
+| `geoffrey_llm.audit` | 统一审计服务 SDK(装饰器/中间件 fire-and-forget 接入,纯标准库) | 无需 extra | ![Active](https://img.shields.io/badge/status-Active-green) |
 | `geoffrey_llm.finetune` | 大模型微调(LoRA / QLoRA,基于 transformers/peft) | `[finetune]` | ![Planned](https://img.shields.io/badge/status-Planned-lightgrey) |
+| `geoffrey_llm.cloud` | 多云核心资源统一入口(阿里云/腾讯云/华为云/AWS) | `[cloud-*]` | ![Alpha](https://img.shields.io/badge/status-Alpha-yellow) |
 
 ## 安装
 
@@ -28,7 +30,13 @@ pip install geoffrey-llm[geocode]
 # 只装博客客户端
 pip install geoffrey-llm[blog]
 
-# 装全部(含 dev 工具)
+# 审计 SDK 纯标准库,基础包即可,无需 extra
+pip install geoffrey-llm
+
+# 只装 AWS 多云适配器（其余厂商对应 cloud-alibaba/cloud-tencent/cloud-huawei）
+pip install geoffrey-llm[cloud-aws]
+
+# 装全部(含 dev 工具；云 SDK 请按需装 cloud 或单厂商 cloud-*)
 pip install geoffrey-llm[all]
 ```
 
@@ -105,6 +113,82 @@ with BlogClient() as blog:
 
 支持分类、文章 CRUD 和分享链接管理：`list_categories`、`list_posts`、`get_post`、`create_post`、`update_post`、`delete_post`、`create_share`、`list_shares`、`revoke_share`。
 
+### 审计接入(audit)
+
+`audit` 把应用接入统一审计服务 [audit.geoffrey-peng.cc](https://audit.geoffrey-peng.cc)。纯标准库实现、零额外依赖;后台线程批量投递,发送失败只告警,**绝不阻塞或影响业务**。未配置时所有调用静默 no-op,应用可以无条件内置审计代码。
+
+```bash
+# 密钥在审计 UI 的「应用」页(/apps)创建
+export AUDIT_ENDPOINT="https://audit.geoffrey-peng.cc/api/v1/events"
+export AUDIT_APP="myapp"
+export AUDIT_KEY="xxxx"
+```
+
+**方式一:装饰器**——业务动作审计,自动记录耗时与成败,异常原样抛出不吞:
+
+```python
+from geoffrey_llm.audit import audit_event
+
+@audit_event(action="post.delete", actor_from="username",
+             resource_type="post", resource_id_from="post_id")
+def delete_post(username, post_id):
+    ...  # 同步 / async 函数均可
+```
+
+**方式二:中间件**——Web 请求自动审计,各一行:
+
+```python
+# FastAPI / Starlette(ASGI)
+from geoffrey_llm.audit import AuditASGIMiddleware
+app = AuditASGIMiddleware(app)
+
+# Flask(WSGI)
+from geoffrey_llm.audit import AuditWSGIMiddleware
+app.wsgi_app = AuditWSGIMiddleware(app.wsgi_app)
+```
+
+**方式三:手动发送**:
+
+```python
+from geoffrey_llm.audit import audit
+audit("share.create", "share.create", resource_id=str(share_id), actor_name="geoffrey")
+```
+
+| 环境变量 | 默认 | 说明 |
+|---|---|---|
+| `AUDIT_ENDPOINT` | — | 审计服务 ingest 地址(必填) |
+| `AUDIT_APP` | — | 应用名,与 UI 创建的一致(必填) |
+| `AUDIT_KEY` | — | 应用密钥(必填) |
+| `AUDIT_ENABLED` | 三项齐备即启用 | 强制开关(`1/true/yes` 或 `0/false/no`) |
+| `AUDIT_BATCH_SIZE` | 20 | 批量大小(服务端上限 100) |
+| `AUDIT_FLUSH_INTERVAL` | 1.0 秒 | 攒批最长等待 |
+| `AUDIT_QUEUE_SIZE` | 1000 | 内存队列上限,满则丢弃 |
+| `AUDIT_TIMEOUT_SECONDS` | 2.0 | 发送超时 |
+
+metadata 中的敏感键(password/token/secret/cookie 等)客户端与服务端双重脱敏。博客现用的独立 `audit_client.py` 后续可平滑迁移到本模块。
+
+### 多云客户端
+
+`cloud` 提供实例、VPC/子网、安全组、对象存储和托管数据库的统一入口。`provider` 与 `region` 可直接用 `Provider` / `Region` 常量点选，无需手写字符串。默认只读；安全组规则变更还必须显式打开变更权限并关闭 dry-run。凭据仅由各官方 SDK 的环境变量、配置文件或工作负载角色链解析，不能写入代码或 `CloudConfig`。
+
+```python
+from geoffrey_llm.cloud import CloudClient, CloudConfig, Provider, Region
+
+cloud = CloudClient(CloudConfig(provider=Provider.AWS, region=Region.AWS.AP_SOUTHEAST_1))
+instances = cloud.instances.list()
+security_groups = cloud.security_groups.list()
+buckets = cloud.object_storage.list_buckets()
+```
+
+本地无凭据验证可使用内存 Mock provider：
+
+```python
+cloud = CloudClient(CloudConfig(provider=Provider.MOCK, region=Region.ALIBABA.CN_BEIJING))
+assert cloud.databases.list()[0].id == "db-demo"
+```
+
+官方资料与资源映射存放在仓库根目录 [`.cloud/`](.cloud/)，其中不允许保存密钥或真实资源标识。
+
 ## 设计原则
 
 - **依赖隔离**:`import geoffrey_llm` 不拉任何重依赖,各模块按 extras 安装
@@ -128,6 +212,7 @@ geoffrey_llm/
 │   ├── cli.py / repl.py
 │   ├── models/ tools/ memory/ session/ cmd/ mcp/ prompts/
 ├── blog/           # 个人博客 REST API 客户端
+├── cloud/          # 多云统一入口(client/config/constants/models/providers)
 └── finetune/       # 大模型微调(占位)
 ```
 
