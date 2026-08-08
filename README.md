@@ -15,6 +15,7 @@
 | `geoffrey_llm.geocode` | 大模型 agent 构建(Claude Code 风格 REPL) | `[geocode]` | ![Alpha](https://img.shields.io/badge/status-Alpha-yellow) |
 | `geoffrey_llm.blog` | 个人博客 REST API 客户端 | `[blog]` | ![Active](https://img.shields.io/badge/status-Active-green) |
 | `geoffrey_llm.audit` | 统一审计服务 SDK(装饰器/中间件 fire-and-forget 接入,纯标准库) | 无需 extra | ![Active](https://img.shields.io/badge/status-Active-green) |
+| `geoffrey_llm.retrieval` | 检索 API 客户端(重排序 / BGE-M3 混合向量嵌入) | `[retrieval]` | ![Active](https://img.shields.io/badge/status-Active-green) |
 | `geoffrey_llm.finetune` | 大模型微调(LoRA / QLoRA,基于 transformers/peft) | `[finetune]` | ![Planned](https://img.shields.io/badge/status-Planned-lightgrey) |
 | `geoffrey_llm.cloud` | 多云核心资源统一入口(阿里云/腾讯云/华为云/AWS) | `[cloud-*]` | ![Alpha](https://img.shields.io/badge/status-Alpha-yellow) |
 
@@ -29,6 +30,9 @@ pip install geoffrey-llm[geocode]
 
 # 只装博客客户端
 pip install geoffrey-llm[blog]
+
+# 只装检索客户端(重排序 / 嵌入)
+pip install geoffrey-llm[retrieval]
 
 # 审计 SDK 纯标准库,基础包即可,无需 extra
 pip install geoffrey-llm
@@ -112,6 +116,36 @@ with BlogClient() as blog:
 ```
 
 支持分类、文章 CRUD 和分享链接管理：`list_categories`、`list_posts`、`get_post`、`create_post`、`update_post`、`delete_post`、`create_share`、`list_shares`、`revoke_share`。
+
+### 检索客户端(retrieval)
+
+`retrieval` 对接 `https://api.geoffrey-peng.cc/api/v1`，提供 RAG 流程中的召回精排两件套：`rerank`（候选文档相关性精排）与 `embeddings`（BGE-M3 稠密 + 稀疏混合向量）。
+
+```bash
+export RETRIEVAL_API_KEY="your-api-key"
+```
+
+```python
+from geoffrey_llm.retrieval import RetrievalClient
+
+with RetrievalClient() as client:
+    # 精排：按与 query 的相关性给候选文档排序
+    rerank_result = client.rerank(
+        query="什么是深度学习？",
+        documents=["深度学习是AI的一个子领域。", "今天午饭吃什么？"],
+        top_n=1,
+    )
+    print(rerank_result["results"])
+
+    # 嵌入：单个字符串或列表均可，返回 dense_vec + sparse_vec
+    embed = client.embeddings("BGE-M3模型支持多语言混合检索")
+    assert len(embed["data"][0]["dense_vec"]) == 1024
+```
+
+| 环境变量 | 默认 | 说明 |
+|---|---|---|
+| `RETRIEVAL_API_KEY` | — | 检索 API Key(必填) |
+| `RETRIEVAL_BASE_URL` | `https://api.geoffrey-peng.cc/api/v1` | 接口根地址 |
 
 ### 审计接入(audit)
 
@@ -213,6 +247,7 @@ geoffrey_llm/
 │   ├── models/ tools/ memory/ session/ cmd/ mcp/ prompts/
 ├── blog/           # 个人博客 REST API 客户端
 ├── cloud/          # 多云统一入口(client/config/constants/models/providers)
+├── retrieval/      # 检索 API 客户端(重排序 / 嵌入)
 └── finetune/       # 大模型微调(占位)
 ```
 
