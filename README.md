@@ -13,6 +13,7 @@
 | `geoffrey_llm.ml` | 机器学习(基于 sklearn,统一 API + 中文评估报表) | `[ml]` | ![Active](https://img.shields.io/badge/status-Active-green) |
 | `geoffrey_llm.dl` | 深度学习(基于 torch,神经网络封装) | `[dl]` | ![Planned](https://img.shields.io/badge/status-Planned-lightgrey) |
 | `geoffrey_llm.geocode` | 大模型 agent 构建(Claude Code 风格 REPL) | `[geocode]` | ![Alpha](https://img.shields.io/badge/status-Alpha-yellow) |
+| `geoffrey_llm.agent` | 最小 Agent 运行时(Agent + `@tool` + 事件流) | `[agent]` | ![Alpha](https://img.shields.io/badge/status-Alpha-yellow) |
 | `geoffrey_llm.blog` | 个人博客 REST API 客户端 | `[blog]` | ![Active](https://img.shields.io/badge/status-Active-green) |
 | `geoffrey_llm.audit` | 统一审计服务 SDK(装饰器/中间件 fire-and-forget 接入,纯标准库) | 无需 extra | ![Active](https://img.shields.io/badge/status-Active-green) |
 | `geoffrey_llm.retrieval` | 检索 API 客户端(重排序 / BGE-M3 混合向量嵌入) | `[retrieval]` | ![Active](https://img.shields.io/badge/status-Active-green) |
@@ -33,6 +34,9 @@ pip install geoffrey-llm[blog]
 
 # 只装检索客户端(重排序 / 嵌入)
 pip install geoffrey-llm[retrieval]
+
+# 只装 Agent 运行时
+pip install geoffrey-llm[agent]
 
 # 审计 SDK 纯标准库,基础包即可,无需 extra
 pip install geoffrey-llm
@@ -91,6 +95,66 @@ geocode 特性:
 - 文件式记忆系统(yaml frontmatter)
 - 会话持久化与 resume
 - MCP (Model Context Protocol) 集成
+
+### Agent 运行时(agent)
+
+`agent` 是 geocode 之上抽出的最小 Agent 框架层。设计哲学:**Agent = 受治理的循环**——循环本身几十行就能写完,框架的价值在循环之外:工具结果回灌、并行工具执行、迭代预算、事件流、可检视可持久化的对话历史。
+
+```bash
+export DEEPSEEK_API_KEY="your-key"  # 或其他 provider 的 key
+```
+
+```python
+from geoffrey_llm.agent import Agent, tool
+
+@tool
+def search_posts(query: str, top_n: int = 5) -> str:
+    """按关键词检索博客文章。
+
+    Args:
+        query: 搜索关键词
+        top_n: 返回条数
+    """
+    ...  # 任意同步或异步函数,入参 schema 自动从签名生成
+
+agent = Agent(
+    model="deepseek/deepseek-chat",   # provider/model,也接受 geocode 的 BaseModel 实例
+    tools=[search_posts],             # @tool 函数或 geocode 的 Tool 实例
+    instructions="你是博客助手,回答前先检索资料。",
+)
+
+result = agent.run("总结最近关于 RAG 的文章")   # 同步;async 上下文用 await agent.arun(...)
+print(result.output)       # 最终回答
+print(result.iterations)   # 循环轮数
+print(result.usage)        # 累计 token 用量
+print(result.finish_reason)  # "stop" 或 "max_iterations"
+```
+
+事件流——边跑边看 agent 在干什么(适合做 UI / 审计):
+
+```python
+import asyncio
+
+async def main():
+    async for event in agent.astream("帮我查一下并写篇草稿"):
+        if event.type == "assistant":
+            print(f"[模型] {event.content}")
+        elif event.type == "tool_call":
+            print(f"[调用] {event.tool_name}({event.arguments})")
+        elif event.type == "tool_result":
+            print(f"[结果] {event.result.output}")
+        elif event.type == "final":
+            print(f"[完成] {event.content}")
+
+asyncio.run(main())
+```
+
+要点:
+- **回灌循环**:工具结果自动回传模型继续推理,直到模型不再请求工具;`max_iterations`(默认 25)兜底
+- **并行工具**:同一轮多个 tool call 并发执行,结果按顺序回填
+- **错误自愈**:工具抛异常 / 参数 JSON 非法 / 工具不存在,都以错误文本回灌模型自行纠正,不打断循环
+- **历史治理**:`agent.history` 不含 system prompt,可跨轮累积、可传入 `history=` 分叉重放;REPL 与会话持久化共用同一循环
+- `agent.default_tools()` 提供内置的 FileRead / FileWrite / FileEdit / Bash 四件套
 
 ### 博客客户端
 
@@ -242,7 +306,11 @@ geoffrey_llm/
 │   ├── models.py
 │   └── backends/
 ├── dl/             # 深度学习(占位)
-├── geocode/        # agent 构建
+├── agent/          # 最小 Agent 运行时
+│   ├── core.py     #   Agent 循环 / 事件流 / 结果
+│   ├── tool.py     #   @tool 装饰器(函数 → 工具)
+│   └── builtins.py #   geocode 内置工具快捷入口
+├── geocode/        # agent 构建(REPL 基于 agent 循环)
 │   ├── cli.py / repl.py
 │   ├── models/ tools/ memory/ session/ cmd/ mcp/ prompts/
 ├── blog/           # 个人博客 REST API 客户端
@@ -262,4 +330,7 @@ MIT
 - [ ] `ml`: 特征工程 / 自动调参 / 模型解释性
 - [ ] `dl`: CNN / RNN / Transformer 封装,DLTrainer
 - [ ] `finetune`: LoRATrainer / QLoRATrainer / DatasetPreprocessor
+- [x] `agent`: 最小 Agent 运行时(循环回灌 / `@tool` / 事件流),geocode REPL 迁移至该循环
+- [ ] `agent`: token 级流式输出(含流式 tool call 聚合)
+- [ ] `agent`: 审计(audit)与权限门禁原生集成
 - [ ] `geocode`: 更多 provider、工具系统增强

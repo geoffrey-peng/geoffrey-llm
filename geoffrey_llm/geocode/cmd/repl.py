@@ -10,22 +10,20 @@ from rich.console import Console
 from geoffrey_llm.geocode.cmd.output import Output
 from geoffrey_llm.geocode.cmd.history import History
 from geoffrey_llm.geocode.cmd.keybindings import Keybindings
-from geoffrey_llm.geocode.models.base import BaseModel, ModelConfig, ModelResponse, get_registry
-from geoffrey_llm.geocode.tools.base import ToolRegistry, Tool, ToolCall, get_tool_registry
+from geoffrey_llm.geocode.models.base import BaseModel, ModelConfig, get_registry
+from geoffrey_llm.geocode.tools.base import ToolRegistry, get_tool_registry
 from geoffrey_llm.geocode.prompts.builder import SystemPromptBuilder
 from geoffrey_llm.geocode.session.manager import SessionManager, Session
+from geoffrey_llm.agent import Agent, DEFAULT_MAX_ITERATIONS
 
 
 class REPL:
     """
     Interactive REPL for geocode.
 
-    Main loop:
-    1. Read user input
-    2. Build prompt with context
-    3. Call model
-    4. Handle tool calls if needed
-    5. Display response
+    Chat handling is delegated to the geoffrey_llm.agent loop, which keeps
+    calling the model until it stops requesting tools (or hits the iteration
+    budget). The REPL only owns input, output rendering and sessions.
     """
 
     def __init__(
@@ -54,6 +52,13 @@ class REPL:
 
         # Message history for current conversation
         self.messages: list[dict] = []
+
+        # Agent loop (chat turns are delegated to it)
+        self.agent = Agent(
+            model=self.model,
+            tools=self.tools,
+            max_iterations=self.config.get("max_iterations", DEFAULT_MAX_ITERATIONS),
+        )
 
     async def run(self):
         """Run the main REPL loop."""
@@ -156,88 +161,36 @@ class REPL:
             self.output.print_error(f"Unknown command: {cmd}")
 
     async def _handle_chat(self, user_input: str):
-        """Process chat input and get model response."""
-        # Add user message to history
+        """Process chat input through the agent loop (tools loop until final answer)."""
         self.messages.append({"role": "user", "content": user_input})
-
-        # Build system prompt
         system_prompt = self._build_system_prompt()
 
-        # Build full messages list
-        full_messages = [{"role": "system", "content": system_prompt}] + self.messages
-
-        # Get tool definitions
-        tool_defs = self.tools.get_tool_definitions()
-
-        # Call model with tools
-        response = await self.model.chat(full_messages, tools=tool_defs if tool_defs else None)
-
-        # Handle response
-        await self._handle_response(response)
-
-    async def _handle_response(self, response: ModelResponse):
-        """Handle model response, including tool calls."""
-        # Add assistant message to history
-        self.messages.append({"role": "assistant", "content": response.content})
-
-        # Check for tool calls
-        if response.tool_calls:
-            # Handle tool calls
-            for tool_call in response.tool_calls:
-                await self._handle_tool_call(tool_call)
-
-        # Print response
-        if response.content:
-            self.output.print_markdown(response.content)
-
-        # Save session if we have one
-        if self.session:
-            self.session.messages = self.messages
-            self.session_manager.save(self.session)
-
-    async def _handle_tool_call(self, tool_call: dict):
-        """Handle a tool call from the model."""
-        function = tool_call.get("function", {})
-        tool_name = function.get("name")
-        arguments = function.get("arguments", {})
-
-        if isinstance(arguments, str):
-            import json
-            arguments = json.loads(arguments)
-
-        # Find the tool
-        tool = self.tools.get(tool_name)
-        if not tool:
-            self.output.print_error(f"Tool not found: {tool_name}")
-            # Add error as tool result
-            self.messages.append({
-                "role": "tool",
-                "content": f"Error: Tool '{tool_name}' not found",
-                "tool_call_id": tool_call.get("id"),
-                "tool_name": tool_name,
-            })
-            return
-
-        # Execute tool
+        completed = False
         try:
-            validated_input = tool.validate_input(arguments)
-            result = await tool.call(validated_input)
-        except Exception as e:
-            result = type(tool).input_schema.__class__.model_validate({})
-            result.success = False
-            result.error = str(e)
-
-        # Format tool result message
-        tool_result = {
-            "role": "tool",
-            "tool_call_id": tool_call.get("id"),
-            "tool_name": tool_name,
-            "content": result.output or result.error or "",
-        }
-        self.messages.append(tool_result)
-
-        # Print tool execution
-        self.output.print_dim(f"\n[{tool_name}] {result.output or result.error}\n")
+            async for event in self.agent.astream(
+                user_input, history=self.messages[:-1], instructions=system_prompt
+            ):
+                if event.type == "assistant" and event.content:
+                    self.output.print_markdown(event.content)
+                elif event.type == "tool_result" and event.result is not None:
+                    self.output.print_dim(
+                        f"\n[{event.tool_name}] {event.result.output or event.result.error}\n"
+                    )
+                elif event.type == "final":
+                    if event.content:
+                        self.output.print_markdown(event.content)
+                elif event.type == "max_iterations":
+                    self.output.print_error(
+                        f"已达最大循环次数 ({self.agent.max_iterations}),本轮停止。"
+                    )
+            completed = True
+        finally:
+            if completed:
+                self.messages = self.agent.history
+                if self.session:
+                    self.session.messages = self.messages
+                    self.session_manager.save(self.session)
+            # 异常中断时保留当前轮消息,便于用户重试。
 
     def _build_system_prompt(self) -> str:
         """Build the system prompt with tools and context."""
