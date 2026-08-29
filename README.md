@@ -17,6 +17,7 @@
 | `geoffrey_llm.blog` | 个人博客 REST API 客户端 | `[blog]` | ![Active](https://img.shields.io/badge/status-Active-green) |
 | `geoffrey_llm.audit` | 统一审计服务 SDK(装饰器/中间件 fire-and-forget 接入,纯标准库) | 无需 extra | ![Active](https://img.shields.io/badge/status-Active-green) |
 | `geoffrey_llm.retrieval` | 检索 API 客户端(重排序 / BGE-M3 混合向量嵌入) | `[retrieval]` | ![Active](https://img.shields.io/badge/status-Active-green) |
+| `geoffrey_llm.aistudio` | AIStudio 平台客户端(提示词 CRUD / 智能体调用) | `[aistudio]` | ![Active](https://img.shields.io/badge/status-Active-green) |
 | `geoffrey_llm.finetune` | 大模型微调(LoRA / QLoRA,基于 transformers/peft) | `[finetune]` | ![Planned](https://img.shields.io/badge/status-Planned-lightgrey) |
 | `geoffrey_llm.cloud` | 多云核心资源统一入口(阿里云/腾讯云/华为云/AWS) | `[cloud-*]` | ![Alpha](https://img.shields.io/badge/status-Alpha-yellow) |
 
@@ -34,6 +35,9 @@ pip install geoffrey-llm[blog]
 
 # 只装检索客户端(重排序 / 嵌入)
 pip install geoffrey-llm[retrieval]
+
+# 只装 AIStudio 平台客户端(提示词管理 / 智能体调用)
+pip install geoffrey-llm[aistudio]
 
 # 只装 Agent 运行时
 pip install geoffrey-llm[agent]
@@ -210,6 +214,48 @@ with RetrievalClient() as client:
 |---|---|---|
 | `RETRIEVAL_API_KEY` | — | 检索 API Key(必填) |
 | `RETRIEVAL_BASE_URL` | `https://api.geoffrey-peng.cc/api/v1` | 接口根地址 |
+
+### AIStudio 平台客户端(aistudio)
+
+对接自建 LLM 网关平台(Geo Lab / api-platform),提供两类能力:
+
+**1. 提示词管理**(需要平台管理员令牌)
+
+```python
+from geoffrey_llm.aistudio import AIStudioClient
+
+with AIStudioClient(base_url="http://localhost:8001", admin_token="eyJ...") as cli:
+    # 列出全部(含停用);list_prompts() 为公开只读,仅返回已启用
+    for p in cli.list_prompts(include_inactive=True):
+        print(p["id"], p["name"])       # id 为 UUID,创建后固定
+
+    p = cli.create_prompt(name="翻译助手", content="你是一个专业翻译...",
+                          category="翻译", description="中英互译")
+    cli.get_prompt(p["id"])             # 按 ID 查看
+    cli.update_prompt(p["id"], description="新描述", is_active=False)
+    cli.delete_prompt(p["id"])          # 删除
+```
+
+> 提示词 ID 是平台生成的 UUID(如 `3e4b2bf6-9498-...`),不是从 1 开始的数字序号,
+> 创建后即可用于查看 / 修改 / 删除与 SDK 调用。
+
+**2. 智能体调用**(使用发布后创建的 `agent-xxx` Key,管理员令牌亦可调试)
+
+```python
+with AIStudioClient(base_url="http://localhost:8001",
+                    admin_token="eyJ...", agent_api_key="agent-xxx") as cli:
+    for a in cli.list_agents()["agents"]:
+        print(a["app_id"], a["name"], a["status"])   # 仅 published 可被 API 调用
+
+    reply = cli.chat(
+        app_id="app-7eb4e3e92d7a4e11a86d",
+        messages=[{"role": "user", "content": "帮我总结一下这份文档"}],
+    )
+    print(reply["content"])             # 回答
+    print(reply["sources"])             # 引用的知识库切片
+```
+
+环境变量:`AISTUDIO_BASE_URL` / `AISTUDIO_ADMIN_TOKEN` / `AISTUDIO_AGENT_KEY`。
 
 ### 审计接入(audit)
 

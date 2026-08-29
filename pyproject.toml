@@ -61,6 +61,9 @@ geocode = [
 blog = [
     "httpx>=0.25.0",
 ]
+aistudio = [
+    "httpx>=0.25.0",
+]
 agent = [
     "httpx>=0.25.0",
 ]
@@ -110,7 +113,7 @@ cloud = [
     "esdk-obs-python>=3.24",
 ]
 all = [
-    "geoffrey-llm[dev,ml,dl,finetune,geocode,blog,retrieval,agent]",
+    "geoffrey-llm[dev,ml,dl,finetune,geocode,blog,retrieval,agent,aistudio]",
 ]
 
 [project.scripts]
